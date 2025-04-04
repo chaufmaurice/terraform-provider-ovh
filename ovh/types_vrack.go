@@ -136,3 +136,31 @@ type VrackTask struct {
 	LastUpdate   time.Time `json:"lastUpdate"`
 	TodoDate     time.Time `json:"TodoDate"`
 }
+
+// IPv6 - Bridged subrange
+
+type VrackIPv6BridgedSubrange struct {
+	BridgedSubrange string `json:"bridgedSubrange"`
+	Gateway         string `json:"gateway"`
+	Slaac           string `json:"slaac"`
+}
+
+func (v VrackIPv6BridgedSubrange) ToMap() []map[string]interface{} {
+	return []map[string]interface{}{{
+		"subrange": v.BridgedSubrange,
+		"gateway":  v.Gateway,
+		"slaac":    v.Slaac,
+	}}
+}
+
+type VrackIPv6BridgedSubrangeSlaacUpdateOpts struct {
+	Slaac string `json:"slaac"`
+}
+
+func (opts *VrackIPv6BridgedSubrangeSlaacUpdateOpts) FromResource(d *schema.ResourceData) *VrackIPv6BridgedSubrangeSlaacUpdateOpts {
+	var st *schema.Set
+	st = d.Get("bridged_subrange").(*schema.Set)
+	elems := st.List()[0].(map[string]interface{})
+	opts.Slaac = elems["slaac"].(string)
+	return opts
+}
