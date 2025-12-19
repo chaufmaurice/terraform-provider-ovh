@@ -356,6 +356,12 @@ func VrackServicesResourceSchema(ctx context.Context) schema.Schema {
 			Description:         "Date of the Last vRack Services update",
 			MarkdownDescription: "Date of the Last vRack Services update",
 		},
+		"related_id": schema.StringAttribute{
+			CustomType:          ovhtypes.TfStringType{},
+			Optional:            true,
+			Description:         "Link to vrack_vrackservices resource",
+			MarkdownDescription: "Link to vrack_vrackservices resource",
+		},
 	}
 	for k, v := range OrderResourceSchema(ctx).Attributes {
 		attrs[k] = v
@@ -376,6 +382,7 @@ type VrackServicesModel struct {
 	ResourceStatus ovhtypes.TfStringValue                                     `tfsdk:"resource_status" json:"resourceStatus"`
 	TargetSpec     VrackServicesTargetSpecValue                               `tfsdk:"target_spec" json:"targetSpec"`
 	UpdatedAt      ovhtypes.TfStringValue                                     `tfsdk:"updated_at" json:"updatedAt"`
+	RelatedId      ovhtypes.TfStringValue                                     `tfsdk:"related_id" json:"relatedId"`
 	Order          OrderValue                                                 `tfsdk:"order" json:"order"`
 	OvhSubsidiary  ovhtypes.TfStringValue                                     `tfsdk:"ovh_subsidiary" json:"ovhSubsidiary"`
 	Plan           ovhtypes.TfListNestedValue[PlanValue]                      `tfsdk:"plan" json:"plan"`
@@ -386,13 +393,21 @@ func (v *VrackServicesModel) MergeWith(other *VrackServicesModel, overrideChecks
 	if overrideChecksum {
 		v.Checksum = other.Checksum
 	}
-
-	// Always update properties that can be updated via an other resource (ovh_vrack_vrackservices)
-	v.UpdatedAt = other.UpdatedAt
-	v.ResourceStatus = other.ResourceStatus
-
 	if (v.Checksum.IsUnknown() || v.Checksum.IsNull()) && !other.Checksum.IsUnknown() {
 		v.Checksum = other.Checksum
+	}
+
+	// Always update properties that can be updated via an other resource (ovh_vrack_vrackservices)
+	if !other.UpdatedAt.IsUnknown() {
+		v.UpdatedAt = other.UpdatedAt
+	}
+	if !other.ResourceStatus.IsUnknown() {
+		v.ResourceStatus = other.ResourceStatus
+	}
+
+	// RelatedId always comes from state or plan, the API does not return it
+	if v.RelatedId.IsUnknown() || v.RelatedId.IsNull() {
+		v.RelatedId = other.RelatedId
 	}
 
 	if (v.CreatedAt.IsUnknown() || v.CreatedAt.IsNull()) && !other.CreatedAt.IsUnknown() {
@@ -857,8 +872,14 @@ func (v *VrackServicesCurrentStateValue) UnmarshalJSON(data []byte) error {
 func (v *VrackServicesCurrentStateValue) MergeWith(other *VrackServicesCurrentStateValue) {
 
 	// Always update properties that can be updated via an other resource (ovh_vrack_vrackservices)
-	v.ProductStatus = other.ProductStatus
-	v.VrackId = other.VrackId
+
+	if !other.ProductStatus.IsUnknown() {
+		v.ProductStatus = other.ProductStatus
+	}
+
+	if !other.VrackId.IsUnknown() {
+		v.VrackId = other.VrackId
+	}
 
 	if (v.Region.IsUnknown() || v.Region.IsNull()) && !other.Region.IsUnknown() {
 		v.Region = other.Region

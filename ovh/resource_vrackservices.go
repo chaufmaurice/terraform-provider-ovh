@@ -28,7 +28,7 @@ type vrackServicesResource struct {
 }
 
 func (r *vrackServicesResource) Metadata(ctx context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_vrack_services"
+	resp.TypeName = req.ProviderTypeName + "_vrackservices"
 }
 
 func (d *vrackServicesResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
@@ -58,6 +58,7 @@ func (d *vrackServicesResource) ImportState(ctx context.Context, req resource.Im
 
 func (r *vrackServicesResource) Create(ctx context.Context, req resource.CreateRequest, resp *resource.CreateResponse) {
 	var data VrackServicesModel
+	log.Printf("[DEBUG] CREATE called")
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &data)...)
@@ -121,6 +122,17 @@ func (r *vrackServicesResource) Create(ctx context.Context, req resource.CreateR
 		)
 		return
 	}
+	// FIXME:
+	// if err := helpers.WaitForAPIv2ResourceStatusReady(ctx, r.config.OVHClient, endpoint); err != nil {
+	// 	resp.Diagnostics.AddError("Error waiting for resource to be ready", err.Error())
+	// 	return
+	// }
+
+	// // Fetch up-to-date service info
+	// if err := r.config.OVHClient.Get(endpoint, &responseData); err != nil {
+	// 	resp.Diagnostics.AddError(fmt.Sprintf("Error calling Get %s", endpoint), err.Error())
+	// 	return
+	// }
 
 	data.MergeWith(responseData, true)
 
@@ -154,6 +166,8 @@ func (r *vrackServicesResource) Read(ctx context.Context, req resource.ReadReque
 
 func (r *vrackServicesResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
 	var data, planData VrackServicesModel
+	log.Printf("[DEBUG] UPDATE called")
+	// var responseData, data, planData VrackServicesModel
 
 	// Read Terraform plan data into the model
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &planData)...)
@@ -183,7 +197,7 @@ func (r *vrackServicesResource) Update(ctx context.Context, req resource.UpdateR
 		}
 	}
 
-	// Wait
+	// Wait for service to be ready
 	responseData, err := r.WaitForUpdate(ctx, data.Id.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError(
@@ -192,6 +206,17 @@ func (r *vrackServicesResource) Update(ctx context.Context, req resource.UpdateR
 		)
 		return
 	}
+	// FIXME:
+	// if err := helpers.WaitForAPIv2ResourceStatusReady(ctx, r.config.OVHClient, endpoint); err != nil {
+	// 	resp.Diagnostics.AddError("Error waiting for resource to be ready", err.Error())
+	// 	return
+	// }
+
+	// // Fetch up-to-date service info
+	// if err := r.config.OVHClient.Get(endpoint, &responseData); err != nil {
+	// 	resp.Diagnostics.AddError(fmt.Sprintf("Error calling Get %s", endpoint), err.Error())
+	// 	return
+	// }
 
 	responseData.MergeWith(&planData, false)
 
@@ -219,16 +244,17 @@ func (r *vrackServicesResource) WaitForUpdate(ctx context.Context, resourceName 
 			log.Printf("[DEBUG] Pending update on %s : %s", resourceName, status)
 			return res, status, nil
 		},
-		Timeout:    360 * time.Second,
-		Delay:      1 * time.Second,
-		MinTimeout: 3 * time.Second,
+		Timeout:      360 * time.Second,
+		Delay:        1 * time.Second,
+		PollInterval: 2 * time.Second,
+		// MinTimeout: 3 * time.Second,
 	}
 
 	res, err := stateConf.WaitForStateContext(ctx)
 
 	responseData, ok := res.(*VrackServicesModel)
 	if !ok {
-		return nil, fmt.Errorf("Error getting %s", endpoint)
+		return nil, fmt.Errorf("error getting %s", endpoint)
 	}
 
 	return responseData, err
@@ -241,6 +267,22 @@ func (r *vrackServicesResource) Delete(ctx context.Context, req resource.DeleteR
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
+	}
+
+	// Check terminate conditions
+	if !data.TargetSpec.Subnets.IsNull() && !data.TargetSpec.Subnets.IsUnknown() {
+		for _, elem := range data.TargetSpec.Subnets.Elements() {
+			subnet := elem.(TargetSpecSubnetsValue)
+			if subnet.ServiceEndpoints.IsNull() || subnet.ServiceEndpoints.IsUnknown() {
+				continue
+			}
+
+			if len(subnet.ServiceEndpoints.Elements()) > 0 {
+				resp.Diagnostics.AddError("failed to delete resource",
+					"every existing ServiceEndpoints must be deleted before terminate the resource")
+				return
+			}
+		}
 	}
 
 	resourceName := data.Id.ValueString()
