@@ -213,6 +213,8 @@ In order to run the Acceptance Tests for development, the following environment 
 
 * `OVH_VRACK_SERVICE_TEST` - The ID of the vRack to use.
 
+* `OVH_VRACK_SERVICES_SERVICE_TEST` - The ID of the vRackServices to use.
+
 * `OVH_CLOUD_LOADBALANCER_ID_TEST` - The ID of the LoadBalancer to use.
 
 * `OVH_CLOUD_PROJECT_SERVICE_TEST` - The ID of your public cloud project.
